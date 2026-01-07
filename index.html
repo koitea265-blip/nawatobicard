@@ -1,0 +1,951 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>がんばれ！なわとびカード</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'M PLUS Rounded 1c', sans-serif;
+            background-color: #FFF5F7;
+            touch-action: manipulation;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 4px; }
+        
+        /* Input Reset */
+        input[type="number"]::-webkit-inner-spin-button, 
+        input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        
+        /* Animations */
+        @keyframes pop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+        .animate-pop { animation: pop 0.3s ease-out; }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        /* Tab Styles */
+        .tab-content { display: none; }
+        .tab-content.active { display: block; animation: fadeIn 0.3s ease-out; }
+        
+        .nav-item.active { color: #ea580c; }
+        .nav-item.active .nav-icon { background-color: #ffedd5; transform: translateY(-4px); }
+
+        /* Table Styles */
+        table {
+            border-collapse: separate;
+            border-spacing: 0;
+        }
+        th, td {
+            border-bottom: 1px solid #94a3b8;
+            border-right: 1px solid #94a3b8;
+            box-sizing: border-box;
+        }
+        thead th { border-top: 1px solid #94a3b8; }
+        th:first-child, td:first-child { border-left: 1px solid #94a3b8; }
+
+        /* Sticky Styles */
+        .sticky-col {
+            position: sticky;
+            left: 0;
+            background-color: #fff;
+            z-index: 10;
+            border-right: 3px double #64748b !important; 
+        }
+        .sticky-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+        }
+        .sticky-corner {
+            position: sticky;
+            left: 0;
+            top: 0;
+            z-index: 30;
+            background-color: #fff7ed; /* orange-50 */
+            border-right: 3px double #64748b !important;
+            border-top: 1px solid #94a3b8;
+        }
+        
+        /* Calendar specific */
+        .cal-day:hover { background-color: #ffedd5; }
+        .cal-today { background-color: #fff7ed; border: 2px solid #fb923c; color: #c2410c; }
+    </style>
+</head>
+<body class="text-slate-700 pb-32 bg-slate-50">
+
+    <canvas id="confetti-canvas" class="fixed top-0 left-0 w-full h-full pointer-events-none z-50"></canvas>
+
+    <!-- Header -->
+    <header class="bg-sky-400 text-white p-3 sticky top-0 z-40 shadow-md">
+        <div class="max-w-4xl mx-auto flex flex-col gap-2">
+            <!-- Title & Export Button Row -->
+            <div class="flex justify-between items-center">
+                <h1 class="text-xl font-extrabold flex items-center gap-2 drop-shadow-md">
+                    <span class="text-2xl">➰</span> なわとびカード
+                </h1>
+                <button onclick="exportData()" class="bg-white/20 hover:bg-white/40 text-white border border-white/50 rounded-full px-3 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                    <span>📋</span> 記録をコピー
+                </button>
+            </div>
+            
+            <div class="flex gap-2 text-sm overflow-x-auto pb-1">
+                <div class="flex items-center bg-white/20 rounded px-2 py-1 shrink-0">
+                    <input type="tel" id="grade" class="w-6 text-center font-bold bg-transparent outline-none border-b border-white placeholder-sky-100 text-white" placeholder="年">
+                    <span class="font-bold ml-1">年</span>
+                </div>
+                <div class="flex items-center bg-white/20 rounded px-2 py-1 shrink-0">
+                    <input type="tel" id="classNum" class="w-6 text-center font-bold bg-transparent outline-none border-b border-white placeholder-sky-100 text-white" placeholder="組">
+                    <span class="font-bold ml-1">組</span>
+                </div>
+                <div class="flex items-center bg-white/20 rounded px-2 py-1 shrink-0">
+                    <input type="tel" id="studentNumber" class="w-8 text-center font-bold bg-transparent outline-none border-b border-white placeholder-sky-100 text-white" placeholder="番">
+                    <span class="font-bold ml-1">番</span>
+                </div>
+                <div class="flex items-center bg-white/20 rounded px-2 py-1 flex-grow min-w-[120px]">
+                    <span class="font-bold mr-2 whitespace-nowrap">名前</span>
+                    <input type="text" id="name" class="w-full font-bold bg-transparent outline-none border-b border-white placeholder-sky-100 text-white" placeholder="ここに入力">
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-full mx-auto p-2 sm:p-4">
+
+        <!-- TAB 1: STATS -->
+        <div id="view-stats" class="tab-content active space-y-6 max-w-2xl mx-auto">
+            <section class="bg-white rounded-3xl p-4 sm:p-6 shadow-md border-4 border-sky-100 relative overflow-hidden min-h-[300px]">
+                <!-- Trophy Icon Background -->
+                <div class="absolute inset-0 flex items-center justify-center opacity-10 pointer-events-none">
+                    <span class="text-[12rem] sm:text-[16rem]">🏆</span>
+                </div>
+                
+                <div class="flex flex-wrap justify-between items-center mb-6 relative z-10 gap-2">
+                    <h2 class="text-lg font-bold text-sky-600 flex items-center gap-2">
+                        <span>🌟</span> 合計と目標
+                    </h2>
+                    <button onclick="openGoalSettings()" class="bg-sky-100 hover:bg-sky-200 text-sky-600 text-xs font-bold px-4 py-2 rounded-full transition flex items-center gap-1 shadow-sm border border-sky-200">
+                        <span>⚙️</span> 種目・目標の設定
+                    </button>
+                </div>
+                <div class="space-y-8 relative z-10" id="stats-container"></div>
+            </section>
+            <div class="text-center pt-8 pb-20">
+                <button onclick="resetAllData()" class="text-xs text-slate-400 underline hover:text-red-500 transition p-4">
+                    データをすべて消す（リセット）
+                </button>
+            </div>
+        </div>
+
+        <!-- TAB 2: RECORDS -->
+        <div id="view-records" class="tab-content space-y-4">
+            <div class="flex justify-center mb-4">
+                <button onclick="addNewDay()" class="bg-orange-500 hover:bg-orange-600 text-white font-bold text-lg py-3 px-8 rounded-full shadow-lg transform transition hover:scale-105 active:scale-95 flex items-center gap-2 border-4 border-white ring-4 ring-orange-200">
+                    <span class="text-2xl">✏️</span>
+                    <span>きょうの記録を追加</span>
+                </button>
+            </div>
+
+            <div class="bg-white rounded-lg shadow-md border border-slate-400 overflow-hidden relative">
+                <div class="overflow-x-auto pb-2" id="table-scroll-container">
+                    <table class="whitespace-nowrap">
+                        <thead class="bg-orange-50 text-orange-800">
+                            <tr id="records-header-row">
+                                <!-- Generated by JS -->
+                            </tr>
+                        </thead>
+                        <tbody id="records-body">
+                            <!-- Generated by JS -->
+                        </tbody>
+                        <tfoot>
+                            <tr id="records-footer-row" class="bg-slate-50">
+                                <!-- Generated by JS -->
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+            </div>
+            <p class="text-center text-xs text-slate-400">日付を押すとカレンダーが出るよ。<br>右にスクロールすると最新の日付があります。</p>
+        </div>
+
+    </main>
+
+    <!-- Bottom Nav -->
+    <nav class="fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 pb-safe z-50 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+        <div class="max-w-2xl mx-auto flex justify-around items-center h-20 px-2 pb-2">
+            <button onclick="switchTab('stats')" class="nav-item active flex-1 flex flex-col items-center justify-center gap-1 group text-slate-400 transition-colors">
+                <div class="nav-icon w-12 h-8 rounded-full flex items-center justify-center transition-all duration-300">
+                    <span class="text-2xl group-hover:scale-110 transition-transform">🏆</span>
+                </div>
+                <span class="text-xs font-bold">ごうけい</span>
+            </button>
+            <div class="w-px h-10 bg-slate-100"></div>
+            <button onclick="switchTab('records')" class="nav-item flex-1 flex flex-col items-center justify-center gap-1 group text-slate-400 transition-colors">
+                <div class="nav-icon w-12 h-8 rounded-full flex items-center justify-center transition-all duration-300">
+                    <span class="text-2xl group-hover:scale-110 transition-transform">📝</span>
+                </div>
+                <span class="text-xs font-bold">きろく</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Modal: Goal Update -->
+    <div id="goal-update-modal" class="fixed inset-0 bg-black/60 z-[110] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm animate-pop border-4 border-yellow-300 shadow-2xl relative overflow-hidden">
+            <div class="absolute inset-0 bg-yellow-50 -z-10"></div>
+            <div class="text-6xl mb-4 text-center">🎊</div>
+            <h3 class="text-2xl font-extrabold text-orange-600 mb-2 text-center">目標達成！</h3>
+            <p class="text-center font-bold text-slate-700 mb-4">おめでとうございます！</p>
+            
+            <div class="bg-white p-4 rounded-xl border border-orange-200 mb-6 text-center shadow-sm">
+                <div class="text-sm text-slate-500 font-bold mb-1">次の目標</div>
+                <div id="update-modal-skill" class="text-lg font-bold text-sky-600 mb-2"></div>
+                <div class="flex items-center justify-center gap-2 text-xl font-extrabold text-orange-600">
+                    <span id="update-modal-old" class="line-through text-slate-400 text-base"></span>
+                    <span>→</span>
+                    <span id="update-modal-new" class="text-3xl"></span>
+                    <span class="text-sm">回</span>
+                </div>
+                <div class="text-xs text-orange-400 font-bold mt-1">(20% UP!)</div>
+            </div>
+
+            <p class="text-center font-bold text-slate-600 mb-4">に変更しますか？</p>
+
+            <div class="flex gap-3">
+                <button onclick="closeGoalUpdateModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold py-3 rounded-xl transition">いいえ</button>
+                <button onclick="confirmGoalUpdate()" class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl shadow-lg transition">はい</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Delete Confirmation -->
+    <div id="delete-modal" class="fixed inset-0 bg-black/50 z-[110] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-xs animate-pop border-4 border-slate-200 shadow-xl">
+            <h3 class="text-lg font-bold text-slate-700 mb-4 text-center">データを消しますか？</h3>
+            <p class="text-sm text-slate-500 mb-6 text-center">この操作は元に戻せません。</p>
+            <div class="flex gap-3">
+                <button onclick="closeDeleteModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold py-2 rounded-xl">キャンセル</button>
+                <button onclick="executeDelete()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-xl shadow-md">消す</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Goal Settings -->
+    <div id="goal-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-md animate-pop border-4 border-sky-200 shadow-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-sky-600">⚙️ 種目と目標の設定</h3>
+                <button onclick="closeGoalSettings()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold">×</button>
+            </div>
+            <p class="text-xs text-slate-500 mb-2">種目名も書き換えられます。</p>
+            <div id="skill-settings-list" class="space-y-3 mb-4 overflow-y-auto flex-1 pr-1"></div>
+            <div class="bg-sky-50 p-3 rounded-xl border border-sky-100 mb-4 shrink-0">
+                <h4 class="text-sm font-bold text-sky-700 mb-2">➕ 新しい種目を追加</h4>
+                <div class="flex gap-2 mb-2">
+                    <input type="text" id="new-skill-name" placeholder="種目名" class="flex-1 text-sm p-2 rounded border border-sky-200">
+                    <input type="number" id="new-skill-goal" placeholder="目標" class="w-20 text-sm p-2 rounded border border-sky-200">
+                </div>
+                <button onclick="addNewSkill()" class="w-full bg-sky-500 hover:bg-sky-600 text-white font-bold py-2 rounded-lg text-sm transition shadow-sm">追加する</button>
+            </div>
+            <div class="flex gap-2 shrink-0">
+                <button onclick="closeGoalSettings()" class="flex-1 bg-slate-200 text-slate-600 font-bold py-3 rounded-xl hover:bg-slate-300">閉じる</button>
+                <button onclick="saveGoalSettings()" class="flex-1 bg-sky-500 text-white font-bold py-3 rounded-xl hover:bg-sky-600 shadow-md">保存して更新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Calendar -->
+    <div id="calendar-modal" class="fixed inset-0 bg-black/50 z-[100] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm animate-pop border-4 border-orange-200 shadow-2xl relative">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-orange-600 flex items-center gap-2">
+                    <span>📅</span> 日付をえらぶ
+                </h3>
+                <button onclick="closeCalendar()" class="text-slate-400 hover:text-slate-600 text-2xl font-bold bg-slate-100 rounded-full w-8 h-8 flex items-center justify-center">×</button>
+            </div>
+            
+            <div class="flex justify-between items-center mb-4 bg-orange-50 p-2 rounded-xl border border-orange-100">
+                <button onclick="changeCalMonth(-1)" class="text-orange-500 font-bold px-3 py-1 rounded hover:bg-orange-100 text-lg">◀</button>
+                <span id="cal-title" class="font-bold text-xl text-slate-700 tracking-wider"></span>
+                <button onclick="changeCalMonth(1)" class="text-orange-500 font-bold px-3 py-1 rounded hover:bg-orange-100 text-lg">▶</button>
+            </div>
+
+            <div class="grid grid-cols-7 gap-1 mb-2 text-center text-xs font-bold text-slate-400">
+                <div class="text-red-400">日</div><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div class="text-blue-400">土</div>
+            </div>
+            
+            <div id="cal-grid" class="grid grid-cols-7 gap-1 text-center font-bold text-slate-600">
+                <!-- JS injected -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Copy Success -->
+    <div id="copy-modal" class="fixed inset-0 bg-black/50 z-[110] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-sm animate-pop border-4 border-sky-300 shadow-2xl relative text-center">
+            <div class="text-5xl mb-4">📋</div>
+            <h3 class="text-xl font-extrabold text-sky-600 mb-2">コピーしました！</h3>
+            <p class="text-sm text-slate-600 mb-6 font-bold leading-relaxed">
+                スプレッドシートを開いて<br>
+                <span class="bg-orange-100 text-orange-600 px-2 py-1 rounded">Ctrl</span> + <span class="bg-orange-100 text-orange-600 px-2 py-1 rounded">V</span> で<br>
+                貼り付けてください。
+            </p>
+            <button onclick="closeCopyModal()" class="bg-sky-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-sky-600 transition w-full">OK</button>
+        </div>
+    </div>
+
+    <!-- Hidden textarea for copying -->
+    <textarea id="copy-target" class="fixed top-0 left-0 opacity-0 pointer-events-none"></textarea>
+
+    <script>
+        // --- 🎵 Audio Manager ---
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const Sound = {
+            playTone: (freq, type, duration) => {
+                if (audioCtx.state === 'suspended') audioCtx.resume();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start();
+                osc.stop(audioCtx.currentTime + duration);
+            },
+            click: () => Sound.playTone(600, 'sine', 0.1),
+            success: () => { Sound.playTone(800, 'sine', 0.1); setTimeout(() => Sound.playTone(1200, 'sine', 0.2), 100); },
+            fanfare: () => {
+                const now = audioCtx.currentTime;
+                const notes = [523.25, 659.25, 783.99, 1046.50];
+                notes.forEach((freq, i) => setTimeout(() => Sound.playTone(freq, 'triangle', 0.8), i * 150));
+            }
+        };
+
+        // --- 🎉 Visual Effects ---
+        class Confetti {
+            constructor() {
+                this.canvas = document.getElementById('confetti-canvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.resize();
+                window.addEventListener('resize', () => this.resize());
+                this.particles = [];
+                this.isAnimating = false;
+            }
+            resize() { this.canvas.width = window.innerWidth; this.canvas.height = window.innerHeight; }
+            createParticles() {
+                const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#FF9F43', '#54A0FF'];
+                for (let i = 0; i < 100; i++) {
+                    this.particles.push({
+                        x: window.innerWidth / 2, y: window.innerHeight / 2,
+                        vx: (Math.random() - 0.5) * 10, vy: (Math.random() - 0.5) * 10 - 5,
+                        size: Math.random() * 8 + 4, color: colors[Math.floor(Math.random() * colors.length)],
+                        rotation: Math.random() * 360, dr: (Math.random() - 0.5) * 10
+                    });
+                }
+            }
+            animate() {
+                if (this.particles.length === 0) { this.isAnimating = false; this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height); return; }
+                this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+                this.particles.forEach((p, index) => {
+                    p.x += p.vx; p.y += p.vy; p.vy += 0.2; p.rotation += p.dr;
+                    this.ctx.save(); this.ctx.translate(p.x, p.y); this.ctx.rotate(p.rotation * Math.PI / 180);
+                    this.ctx.fillStyle = p.color; this.ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
+                    this.ctx.restore();
+                    if (p.y > this.canvas.height) this.particles.splice(index, 1);
+                });
+                requestAnimationFrame(() => this.animate());
+            }
+            start() { this.createParticles(); if (!this.isAnimating) { this.isAnimating = true; this.animate(); } }
+        }
+        const confettiEffect = new Confetti();
+
+        // --- 💾 App Logic ---
+        const DEFAULT_SKILLS = [
+            { id: 'mae', label: 'まえとび', color: 'pink' },
+            { id: 'ushiro', label: 'うしろとび', color: 'blue' },
+            { id: 'niju', label: '二重とび', color: 'green' },
+            { id: 'aya', label: 'あやとび', color: 'yellow' },
+            { id: 'usiroaya', label: 'うしろあやとび', color: 'purple' }
+        ];
+        const DEFAULT_GOALS = { mae: 5000, ushiro: 2000, niju: 100, aya: 1000, usiroaya: 500 };
+        const COLOR_PALETTE = ['pink', 'blue', 'green', 'yellow', 'purple', 'teal', 'indigo', 'rose', 'orange', 'cyan'];
+
+        let appData = {
+            profile: { name: '', grade: '', class: '', number: '' },
+            records: [],
+            achievements: [], 
+            goals: { ...DEFAULT_GOALS },
+            skills: JSON.parse(JSON.stringify(DEFAULT_SKILLS))
+        };
+
+        const gradeInput = document.getElementById('grade');
+        const classInput = document.getElementById('classNum');
+        const studentNumberInput = document.getElementById('studentNumber');
+        const nameInput = document.getElementById('name');
+        const statsContainer = document.getElementById('stats-container');
+
+        let calTargetRecordId = null;
+        let calCurrentYear = new Date().getFullYear();
+        let calCurrentMonth = new Date().getMonth();
+        
+        let deleteTargetId = null;
+        let pendingGoalUpdate = null;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+            renderStats();
+            renderRecordsTable();
+            setupProfileListeners();
+            switchTab('stats'); 
+        });
+
+        function getTodayStr() {
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
+        function sortRecords() {
+            appData.records.sort((a, b) => new Date(a.date) - new Date(b.date));
+        }
+
+        function loadData() {
+            const saved = localStorage.getItem('rope_jump_v2');
+            if (saved) {
+                try {
+                    const parsed = JSON.parse(saved);
+                    appData = { ...appData, ...parsed };
+                    if (!appData.skills || appData.skills.length === 0) appData.skills = JSON.parse(JSON.stringify(DEFAULT_SKILLS));
+                    if (!appData.goals) appData.goals = { ...DEFAULT_GOALS };
+                    
+                    // Migration: hayabusa -> usiroaya (ID change)
+                    const oldSkill = appData.skills.find(s => s.id === 'hayabusa');
+                    if (oldSkill) {
+                        oldSkill.id = 'usiroaya';
+                        oldSkill.label = 'うしろあやとび'; 
+                    }
+                    if (appData.goals && appData.goals.hayabusa !== undefined) {
+                        appData.goals.usiroaya = appData.goals.hayabusa;
+                        delete appData.goals.hayabusa;
+                    }
+                    appData.records.forEach(r => {
+                        if (r.hayabusa !== undefined) {
+                            r.usiroaya = r.hayabusa;
+                            delete r.hayabusa;
+                        }
+                    });
+
+                    appData.records.forEach(r => {
+                        if (r.date && !r.date.includes('-')) {
+                            const nums = r.date.match(/\d+/g);
+                            if (nums && nums.length >= 2) {
+                                const y = new Date().getFullYear();
+                                const m = nums[0].padStart(2, '0');
+                                const d = nums[1].padStart(2, '0');
+                                r.date = `${y}-${m}-${d}`;
+                            } else {
+                                r.date = new Date().toISOString().split('T')[0];
+                            }
+                        }
+                    });
+                    
+                    sortRecords();
+                    gradeInput.value = appData.profile.grade || '';
+                    classInput.value = appData.profile.class || '';
+                    studentNumberInput.value = appData.profile.number || '';
+                    nameInput.value = appData.profile.name || '';
+                } catch(e) { console.error("Data load error", e); }
+            }
+        }
+
+        function saveData() {
+            appData.profile.grade = gradeInput.value;
+            appData.profile.class = classInput.value;
+            appData.profile.number = studentNumberInput.value;
+            appData.profile.name = nameInput.value;
+            sortRecords();
+            localStorage.setItem('rope_jump_v2', JSON.stringify(appData));
+        }
+
+        function setupProfileListeners() {
+            [gradeInput, classInput, studentNumberInput, nameInput].forEach(el => el.addEventListener('input', () => saveData()));
+        }
+
+        function switchTab(tabId) {
+            Sound.click();
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${tabId}`).classList.add('active');
+            
+            const btnIndex = tabId === 'stats' ? 0 : 1;
+            document.querySelectorAll('.nav-item')[btnIndex].classList.add('active');
+            
+            if (tabId === 'stats') renderStats();
+            if (tabId === 'records') {
+                renderRecordsTable();
+                setTimeout(() => {
+                    const container = document.getElementById('table-scroll-container');
+                    container.scrollLeft = container.scrollWidth;
+                }, 50);
+            }
+        }
+
+        // --- Export Logic ---
+        function exportData() {
+            Sound.click();
+            
+            // Header: Date, Skill1, Skill2...
+            let headers = ['日付'];
+            appData.skills.forEach(skill => headers.push(skill.label));
+            
+            let rows = [headers.join('\t')];
+            
+            const sortedRecords = [...appData.records].sort((a, b) => new Date(a.date) - new Date(b.date));
+            
+            sortedRecords.forEach(r => {
+                let row = [r.date]; 
+                appData.skills.forEach(skill => {
+                    row.push(r[skill.id] || 0);
+                });
+                rows.push(row.join('\t'));
+            });
+            
+            const tsvContent = rows.join('\n');
+            const textarea = document.getElementById('copy-target');
+            textarea.value = tsvContent;
+            textarea.select();
+            try {
+                document.execCommand('copy');
+                document.getElementById('copy-modal').classList.remove('hidden');
+            } catch (err) {
+                alert('コピーに失敗しました。');
+            }
+        }
+
+        function closeCopyModal() {
+            document.getElementById('copy-modal').classList.add('hidden');
+        }
+
+        // --- Goal Update Logic ---
+        function checkAndTriggerGoalUpdate(skillId, total) {
+            const currentGoal = appData.goals[skillId] || 1000;
+            if (total >= currentGoal) {
+                const goalKey = `goal-${skillId}-${currentGoal}`;
+                if (!appData.achievements.includes(goalKey)) {
+                    appData.achievements.push(goalKey);
+                    saveData();
+                    Sound.fanfare();
+                    confettiEffect.start();
+                    const nextGoal = Math.ceil(currentGoal * 1.2);
+                    pendingGoalUpdate = { skillId, newGoal: nextGoal, oldGoal: currentGoal };
+                    openGoalUpdateModal(skillId, currentGoal, nextGoal);
+                }
+            }
+        }
+
+        function openGoalUpdateModal(skillId, oldGoal, newGoal) {
+            const skill = appData.skills.find(s => s.id === skillId);
+            document.getElementById('update-modal-skill').innerText = skill ? skill.label : 'この種目';
+            document.getElementById('update-modal-old').innerText = oldGoal;
+            document.getElementById('update-modal-new').innerText = newGoal;
+            document.getElementById('goal-update-modal').classList.remove('hidden');
+        }
+
+        function closeGoalUpdateModal() {
+            document.getElementById('goal-update-modal').classList.add('hidden');
+            pendingGoalUpdate = null;
+        }
+
+        function confirmGoalUpdate() {
+            if (pendingGoalUpdate) {
+                appData.goals[pendingGoalUpdate.skillId] = pendingGoalUpdate.newGoal;
+                saveData();
+                renderStats();
+                renderRecordsTable();
+                closeGoalUpdateModal();
+                Sound.success();
+            }
+        }
+
+        // --- Delete Logic ---
+        function openDeleteModal(id) {
+            deleteTargetId = id;
+            document.getElementById('delete-modal').classList.remove('hidden');
+            Sound.click();
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('delete-modal').classList.add('hidden');
+            deleteTargetId = null;
+        }
+        
+        function openResetModal() {
+            deleteTargetId = 'ALL';
+            document.getElementById('delete-modal').classList.remove('hidden');
+            Sound.click();
+        }
+
+        function executeDelete() {
+            if (deleteTargetId === 'ALL') {
+                localStorage.removeItem('rope_jump_v2');
+                location.reload();
+            } else if (deleteTargetId) {
+                appData.records = appData.records.filter(r => r.id !== deleteTargetId);
+                saveData();
+                renderRecordsTable();
+                renderStats();
+                closeDeleteModal();
+            }
+        }
+
+        // --- Custom Calendar Logic ---
+        function openCalendar(recordId, currentDateStr) {
+            Sound.click();
+            calTargetRecordId = recordId;
+            const date = new Date(currentDateStr);
+            calCurrentYear = date.getFullYear();
+            calCurrentMonth = date.getMonth();
+            renderCalendar();
+            document.getElementById('calendar-modal').classList.remove('hidden');
+        }
+
+        function closeCalendar() {
+            document.getElementById('calendar-modal').classList.add('hidden');
+        }
+
+        function changeCalMonth(delta) {
+            calCurrentMonth += delta;
+            if (calCurrentMonth > 11) {
+                calCurrentMonth = 0;
+                calCurrentYear++;
+            } else if (calCurrentMonth < 0) {
+                calCurrentMonth = 11;
+                calCurrentYear--;
+            }
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            document.getElementById('cal-title').innerText = `${calCurrentYear}年 ${calCurrentMonth + 1}月`;
+            const grid = document.getElementById('cal-grid');
+            grid.innerHTML = '';
+            const firstDay = new Date(calCurrentYear, calCurrentMonth, 1).getDay();
+            const daysInMonth = new Date(calCurrentYear, calCurrentMonth + 1, 0).getDate();
+            const todayStr = getTodayStr();
+
+            for (let i = 0; i < firstDay; i++) {
+                grid.innerHTML += `<div></div>`;
+            }
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateStr = `${calCurrentYear}-${String(calCurrentMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const isToday = dateStr === todayStr;
+                const exists = appData.records.some(r => r.date === dateStr && r.id !== calTargetRecordId);
+                const disabledClass = exists ? 'opacity-30 cursor-not-allowed bg-slate-100' : 'cursor-pointer hover:bg-orange-100';
+                
+                const div = document.createElement('div');
+                div.className = `p-2 rounded-lg transition ${isToday ? 'cal-today' : ''} ${disabledClass}`;
+                div.innerText = d;
+                
+                if (!exists) {
+                    div.onclick = () => selectDate(dateStr);
+                }
+                grid.appendChild(div);
+            }
+        }
+
+        function selectDate(newDate) {
+            if (calTargetRecordId) {
+                const record = appData.records.find(r => r.id === calTargetRecordId);
+                if (record) {
+                    record.date = newDate;
+                    saveData();
+                    renderRecordsTable();
+                    closeCalendar();
+                    Sound.success();
+                }
+            }
+        }
+
+        // --- Stats Logic ---
+        function getTotals() {
+            const totals = {};
+            appData.skills.forEach(skill => totals[skill.id] = 0);
+            appData.records.forEach(r => {
+                appData.skills.forEach(skill => {
+                    totals[skill.id] += (parseInt(r[skill.id]) || 0);
+                });
+            });
+            return totals;
+        }
+
+        function renderStats() {
+            const totals = getTotals();
+            statsContainer.innerHTML = '';
+
+            appData.skills.forEach(skill => {
+                const total = totals[skill.id];
+                const goal = appData.goals[skill.id] || 1000;
+                const percentage = Math.min(100, (total / goal) * 100);
+                
+                const tickCount = 10;
+                let ticksHtml = '';
+                let labelsHtml = '';
+                const step = goal / tickCount;
+
+                for(let i=1; i<tickCount; i++) {
+                   const pos = (i / tickCount) * 100;
+                   ticksHtml += `<div class="absolute top-0 bottom-0 w-0.5 bg-white z-10" style="left: ${pos}%"></div>`;
+                   const val = Math.round(step * i);
+                   labelsHtml += `<div class="absolute text-[8px] sm:text-[9px] text-slate-400 font-bold transform -translate-x-1/2 mt-1 whitespace-nowrap" style="left: ${pos}%">${val}</div>`;
+                }
+                labelsHtml += `<div class="absolute text-[8px] sm:text-[9px] text-slate-400 font-bold transform -translate-x-1/2 mt-1 whitespace-nowrap" style="left: 100%">${goal}</div>`;
+
+                const html = `
+                    <div class="mb-8">
+                        <div class="flex items-end justify-between mb-1">
+                            <div class="text-sm font-bold text-${skill.color}-600 bg-${skill.color}-50 px-2 py-0.5 rounded-md border border-${skill.color}-100">
+                                ${skill.label}
+                            </div>
+                            <div class="text-xl font-extrabold text-${skill.color}-600 leading-none">
+                                ${total}<span class="text-xs text-slate-400 ml-1 font-normal">回</span>
+                            </div>
+                        </div>
+                        <div class="relative w-full h-8">
+                            <div class="absolute inset-0 bg-slate-200 rounded border border-slate-200 overflow-hidden shadow-inner">
+                                <div class="bg-${skill.color}-400 h-full rounded transition-all duration-1000 ease-out relative flex items-center justify-end pr-2" style="width: ${percentage}%">
+                                    <div class="absolute inset-0 bg-white/20 animate-pulse"></div>
+                                    ${percentage >= 100 ? '<span class="text-xs text-white font-bold relative z-10">★</span>' : ''}
+                                </div>
+                                <div class="absolute inset-0 pointer-events-none">${ticksHtml}</div>
+                            </div>
+                            <div class="absolute top-full left-0 w-full h-4">${labelsHtml}</div>
+                        </div>
+                    </div>
+                `;
+                statsContainer.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        // --- Records Table Logic ---
+        function renderRecordsTable() {
+            const headerRow = document.getElementById('records-header-row');
+            const tbody = document.getElementById('records-body');
+            const footerRow = document.getElementById('records-footer-row');
+            
+            headerRow.innerHTML = '';
+            tbody.innerHTML = '';
+            footerRow.innerHTML = '';
+
+            const corner = document.createElement('th');
+            corner.className = 'sticky-corner p-3 text-left font-bold min-w-[120px] shadow-sm';
+            corner.innerHTML = '種目 \\ 日付';
+            headerRow.appendChild(corner);
+
+            const today = getTodayStr();
+
+            appData.records.forEach((record) => {
+                const th = document.createElement('th');
+                const isToday = record.date === today;
+                const bgClass = isToday ? 'bg-orange-100' : 'bg-orange-50';
+                th.className = `w-20 min-w-[5rem] p-1 border border-slate-400 text-center sticky-header ${bgClass}`;
+                
+                const dateVal = record.date;
+                const displayDate = new Date(dateVal).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric', weekday: 'short' });
+                
+                th.innerHTML = `
+                    <div onclick="openCalendar(${record.id}, '${dateVal}')" class="relative group cursor-pointer hover:bg-orange-200 rounded px-1 py-1 transition">
+                        <span class="text-xs font-bold text-orange-800 leading-tight block">
+                            ${displayDate}${isToday ? '<br><span class="text-[10px] text-red-500">今日</span>' : ''}
+                        </span>
+                        <div class="text-[8px] text-orange-400 mt-1">変更</div>
+                    </div>
+                `;
+                headerRow.appendChild(th);
+            });
+
+            appData.skills.forEach((skill, sIndex) => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50";
+                const th = document.createElement('th');
+                th.className = `sticky-col p-2 text-left text-sm font-bold text-${skill.color}-600 shadow-sm`;
+                th.innerHTML = `<span class="inline-block w-2 h-2 rounded-full bg-${skill.color}-400 mr-1"></span>${skill.label}`;
+                tr.appendChild(th);
+
+                appData.records.forEach((record, rIndex) => {
+                    const td = document.createElement('td');
+                    const isToday = record.date === today;
+                    const bgClass = isToday ? 'bg-orange-50/30' : '';
+                    td.className = `p-0 border border-slate-400 text-center align-middle ${bgClass}`;
+                    const val = record[skill.id] !== undefined ? record[skill.id] : '';
+                    
+                    td.innerHTML = `
+                        <input type="number" inputmode="numeric" value="${val}" placeholder=""
+                            id="cell-${sIndex}-${rIndex}"
+                            onkeydown="handleCellEnter(event, ${sIndex}, ${rIndex})"
+                            onfocus="this.select()"
+                            onchange="updateRecord(${record.id}, '${skill.id}', this.value)"
+                            class="w-full h-full min-h-[44px] text-center text-lg font-bold text-slate-700 bg-transparent outline-none focus:bg-${skill.color}-50 focus:ring-2 focus:ring-inset focus:ring-${skill.color}-300 transition-colors">
+                    `;
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+
+            const footerCorner = document.createElement('td');
+            footerCorner.className = 'sticky-col p-2 bg-slate-50 border border-slate-400';
+            footerRow.appendChild(footerCorner);
+
+            appData.records.forEach(record => {
+                const td = document.createElement('td');
+                td.className = "p-1 text-center border border-slate-400";
+                td.innerHTML = `
+                    <button onclick="openDeleteModal(${record.id})" class="text-[10px] text-slate-400 hover:text-red-500 font-bold bg-white border border-slate-200 hover:border-red-300 rounded px-1 py-1 transition w-full">削除</button>
+                `;
+                footerRow.appendChild(td);
+            });
+        }
+
+        // --- Excel-like Navigation Logic ---
+        function handleCellEnter(e, sIndex, rIndex) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); 
+                const nextRowIndex = sIndex + 1;
+                const nextInput = document.getElementById(`cell-${nextRowIndex}-${rIndex}`);
+                if (nextInput) {
+                    nextInput.focus();
+                } else {
+                    e.target.blur();
+                }
+            }
+        }
+
+        // --- Data Update Logic ---
+        function addNewDay() {
+            Sound.click();
+            const dateStr = getTodayStr();
+            const exists = appData.records.find(r => r.date === dateStr);
+            if (exists) {
+                alert('きょうの列はすでにあります！');
+                const container = document.getElementById('table-scroll-container');
+                container.scrollLeft = container.scrollWidth;
+                return;
+            }
+            const newRecord = { id: Date.now(), date: dateStr };
+            appData.records.push(newRecord); // Add to end (Right)
+            saveData();
+            renderRecordsTable();
+            setTimeout(() => {
+                const container = document.getElementById('table-scroll-container');
+                container.scrollLeft = container.scrollWidth;
+            }, 100);
+        }
+
+        function updateRecord(id, skillId, value) {
+            const record = appData.records.find(r => r.id === id);
+            if (record) {
+                const oldVal = parseInt(record[skillId]) || 0;
+                const newVal = parseInt(value) || 0;
+                if (oldVal !== newVal) {
+                    record[skillId] = newVal;
+                    saveData();
+                    if (newVal > oldVal) Sound.success();
+                    
+                    const totals = getTotals();
+                    checkAndTriggerGoalUpdate(skillId, totals[skillId]);
+                }
+            }
+        }
+
+        // --- Goal Settings ---
+        function openGoalSettings() {
+            renderSkillSettingsList();
+            document.getElementById('goal-modal').classList.remove('hidden');
+            Sound.click();
+        }
+        function closeGoalSettings() { document.getElementById('goal-modal').classList.add('hidden'); }
+        function renderSkillSettingsList() {
+            const container = document.getElementById('skill-settings-list');
+            container.innerHTML = '';
+            appData.skills.forEach((skill, index) => {
+                const currentGoal = appData.goals[skill.id] || 1000;
+                const div = document.createElement('div');
+                div.className = `flex items-center gap-2 bg-white p-2 rounded border border-slate-200`;
+                div.innerHTML = `
+                    <div class="flex flex-col gap-1">
+                        <button onclick="moveSkill(${index}, -1)" class="text-slate-400 hover:text-orange-500 font-bold bg-slate-50 rounded px-1 text-xs">▲</button>
+                        <button onclick="moveSkill(${index}, 1)" class="text-slate-400 hover:text-orange-500 font-bold bg-slate-50 rounded px-1 text-xs">▼</button>
+                    </div>
+                    <div class="flex-1">
+                        <input type="text" id="label-${skill.id}" value="${skill.label}" class="w-full text-xs font-bold text-${skill.color}-600 bg-transparent border-b border-${skill.color}-200 focus:border-${skill.color}-500 outline-none mb-1">
+                        <input type="number" id="setting-${skill.id}" value="${currentGoal}" class="w-full text-lg font-bold text-slate-700 bg-slate-50 rounded border border-slate-200 p-1 text-center outline-none focus:ring-2 focus:ring-${skill.color}-400">
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+        function moveSkill(index, direction) {
+            if (direction === -1 && index > 0) [appData.skills[index], appData.skills[index - 1]] = [appData.skills[index - 1], appData.skills[index]];
+            else if (direction === 1 && index < appData.skills.length - 1) [appData.skills[index], appData.skills[index + 1]] = [appData.skills[index + 1], appData.skills[index]];
+            renderSkillSettingsList();
+        }
+        function addNewSkill() {
+            const nameEl = document.getElementById('new-skill-name');
+            const goalEl = document.getElementById('new-skill-goal');
+            const name = nameEl.value.trim();
+            const goal = parseInt(goalEl.value);
+            if (name && goal > 0) {
+                const newId = 'custom_' + Date.now();
+                const color = COLOR_PALETTE[Math.floor(Math.random() * COLOR_PALETTE.length)];
+                appData.skills.push({ id: newId, label: name, color: color });
+                appData.goals[newId] = goal;
+                nameEl.value = ''; goalEl.value = '';
+                renderSkillSettingsList(); Sound.success();
+            } else alert('種目名と目標回数を正しく入力してね');
+        }
+        function saveGoalSettings() {
+            appData.skills.forEach(skill => {
+                const input = document.getElementById(`setting-${skill.id}`);
+                if (input) {
+                    const val = parseInt(input.value);
+                    if (val && val > 0) appData.goals[skill.id] = val;
+                }
+                const labelInput = document.getElementById(`label-${skill.id}`);
+                if (labelInput && labelInput.value.trim() !== "") {
+                    skill.label = labelInput.value.trim();
+                }
+            });
+            saveData(); renderStats(); renderRecordsTable(); closeGoalSettings(); Sound.success();
+        }
+
+        // --- Celebration ---
+        function showCelebration(msg) {
+            document.getElementById('modal-message').innerText = msg;
+            const modal = document.getElementById('modal');
+            modal.classList.remove('hidden');
+            Sound.fanfare();
+            confettiEffect.start();
+        }
+        function closeModal() { document.getElementById('modal').classList.add('hidden'); }
+        function resetAllData() {
+            openResetModal();
+        }
+    </script>
+</body>
+</html>
