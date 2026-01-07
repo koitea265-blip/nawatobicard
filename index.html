@@ -92,13 +92,21 @@
     <header class="bg-sky-400 text-white p-3 sticky top-0 z-40 shadow-md">
         <div class="max-w-4xl mx-auto flex flex-col gap-2">
             <!-- Title & Export Button Row -->
-            <div class="flex justify-between items-center">
+            <div class="flex justify-between items-center flex-wrap gap-2">
                 <h1 class="text-xl font-extrabold flex items-center gap-2 drop-shadow-md">
                     <span class="text-2xl">➰</span> なわとびカード
                 </h1>
-                <button onclick="exportData()" class="bg-white/20 hover:bg-white/40 text-white border border-white/50 rounded-full px-3 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm">
-                    <span>📋</span> 記録をコピー
-                </button>
+                <div class="flex gap-2">
+                    <button onclick="openResetModal()" class="bg-red-500/30 hover:bg-red-500/50 text-white border border-white/50 rounded-full px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                        <span>🗑️</span> リセット
+                    </button>
+                    <button onclick="openImportModal()" class="bg-white/20 hover:bg-white/40 text-white border border-white/50 rounded-full px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                        <span>📥</span> 復元
+                    </button>
+                    <button onclick="exportData()" class="bg-white/20 hover:bg-white/40 text-white border border-white/50 rounded-full px-2 py-1 text-xs font-bold transition flex items-center gap-1 shadow-sm">
+                        <span>📋</span> コピー
+                    </button>
+                </div>
             </div>
             
             <div class="flex gap-2 text-sm overflow-x-auto pb-1">
@@ -142,11 +150,6 @@
                 </div>
                 <div class="space-y-8 relative z-10" id="stats-container"></div>
             </section>
-            <div class="text-center pt-8 pb-20">
-                <button onclick="resetAllData()" class="text-xs text-slate-400 underline hover:text-red-500 transition p-4">
-                    データをすべて消す（リセット）
-                </button>
-            </div>
         </div>
 
         <!-- TAB 2: RECORDS -->
@@ -234,7 +237,7 @@
     <div id="delete-modal" class="fixed inset-0 bg-black/50 z-[110] hidden flex items-center justify-center p-4">
         <div class="bg-white rounded-3xl p-6 w-full max-w-xs animate-pop border-4 border-slate-200 shadow-xl">
             <h3 class="text-lg font-bold text-slate-700 mb-4 text-center">データを消しますか？</h3>
-            <p class="text-sm text-slate-500 mb-6 text-center">この操作は元に戻せません。</p>
+            <p id="delete-modal-msg" class="text-sm text-slate-500 mb-6 text-center">この操作は元に戻せません。</p>
             <div class="flex gap-3">
                 <button onclick="closeDeleteModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold py-2 rounded-xl">キャンセル</button>
                 <button onclick="executeDelete()" class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-xl shadow-md">消す</button>
@@ -303,6 +306,19 @@
                 貼り付けてください。
             </p>
             <button onclick="closeCopyModal()" class="bg-sky-500 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-sky-600 transition w-full">OK</button>
+        </div>
+    </div>
+
+    <!-- Modal: Import Data -->
+    <div id="import-modal" class="fixed inset-0 bg-black/50 z-[120] hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-6 w-full max-w-lg animate-pop border-4 border-green-300 shadow-2xl relative flex flex-col max-h-[90vh]">
+            <h3 class="text-xl font-extrabold text-green-600 mb-4 text-center">📥 記録を復元（インポート）</h3>
+            <p class="text-xs text-slate-500 mb-2">スプレッドシートのデータをコピーして、ここに貼り付けてください。</p>
+            <textarea id="import-textarea" class="w-full h-40 border-2 border-slate-200 rounded-xl p-3 text-xs font-mono bg-slate-50 mb-4 focus:ring-2 focus:ring-green-400 outline-none resize-none" placeholder="ここに貼り付け（日付、種目1、種目2...）"></textarea>
+            <div class="flex gap-3 shrink-0">
+                <button onclick="closeImportModal()" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-600 font-bold py-3 rounded-xl transition">キャンセル</button>
+                <button onclick="executeImport()" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-xl shadow-lg transition">読み込む</button>
+            </div>
         </div>
     </div>
 
@@ -506,6 +522,81 @@
             }
         }
 
+        // --- Import Logic ---
+        function openImportModal() {
+            document.getElementById('import-modal').classList.remove('hidden');
+            document.getElementById('import-textarea').value = '';
+            Sound.click();
+        }
+
+        function closeImportModal() {
+            document.getElementById('import-modal').classList.add('hidden');
+        }
+
+        function executeImport() {
+            const text = document.getElementById('import-textarea').value;
+            if (!text.trim()) {
+                alert('データを貼り付けてください。');
+                return;
+            }
+
+            try {
+                const lines = text.trim().split(/\r?\n/);
+                if (lines.length < 2) {
+                    alert('データ形式が正しくないようです（行数が足りません）。');
+                    return;
+                }
+
+                const headers = lines[0].split('\t');
+                const skillIndices = {};
+                
+                appData.skills.forEach(skill => {
+                    const idx = headers.indexOf(skill.label);
+                    if (idx !== -1) {
+                        skillIndices[skill.id] = idx;
+                    }
+                });
+
+                let importedCount = 0;
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = lines[i].split('\t');
+                    const dateStr = cols[0];
+
+                    if (!dateStr || dateStr.includes('合計')) continue;
+                    if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) continue;
+
+                    let record = appData.records.find(r => r.date === dateStr);
+                    if (!record) {
+                        record = { id: Date.now() + i, date: dateStr };
+                        appData.records.push(record);
+                    }
+
+                    Object.keys(skillIndices).forEach(skillId => {
+                        const idx = skillIndices[skillId];
+                        if (idx < cols.length) {
+                            const val = parseInt(cols[idx]);
+                            if (!isNaN(val)) {
+                                record[skillId] = val;
+                            }
+                        }
+                    });
+                    importedCount++;
+                }
+
+                saveData();
+                renderStats();
+                renderRecordsTable();
+                closeImportModal();
+                alert(`${importedCount}件のデータを読み込みました！`);
+                Sound.success();
+
+            } catch (e) {
+                console.error(e);
+                alert('エラーが発生しました。データ形式を確認してください。');
+            }
+        }
+
         // --- Export Logic ---
         function exportData() {
             Sound.click();
@@ -518,13 +609,24 @@
             
             const sortedRecords = [...appData.records].sort((a, b) => new Date(a.date) - new Date(b.date));
             
+            const totals = {};
+            appData.skills.forEach(skill => totals[skill.id] = 0);
+
             sortedRecords.forEach(r => {
                 let row = [r.date]; 
                 appData.skills.forEach(skill => {
-                    row.push(r[skill.id] || 0);
+                    const val = parseInt(r[skill.id]) || 0;
+                    totals[skill.id] += val;
+                    row.push(val);
                 });
                 rows.push(row.join('\t'));
             });
+
+            let totalRow = ['合計'];
+            appData.skills.forEach(skill => {
+                totalRow.push(totals[skill.id]);
+            });
+            rows.push(totalRow.join('\t'));
             
             const tsvContent = rows.join('\n');
             const textarea = document.getElementById('copy-target');
@@ -586,6 +688,7 @@
         // --- Delete Logic ---
         function openDeleteModal(id) {
             deleteTargetId = id;
+            document.getElementById('delete-modal-msg').innerText = 'この日の記録を削除しますか？';
             document.getElementById('delete-modal').classList.remove('hidden');
             Sound.click();
         }
@@ -597,6 +700,7 @@
         
         function openResetModal() {
             deleteTargetId = 'ALL';
+            document.getElementById('delete-modal-msg').innerText = 'すべてのデータ（名前・記録・設定）が消えます。';
             document.getElementById('delete-modal').classList.remove('hidden');
             Sound.click();
         }
