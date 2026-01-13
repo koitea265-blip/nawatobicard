@@ -467,6 +467,7 @@
                         }
                     });
 
+                    // Date Migration and Normalization
                     appData.records.forEach(r => {
                         if (r.date && !r.date.includes('-')) {
                             const nums = r.date.match(/\d+/g);
@@ -476,7 +477,12 @@
                                 const d = nums[1].padStart(2, '0');
                                 r.date = `${y}-${m}-${d}`;
                             } else {
-                                r.date = new Date().toISOString().split('T')[0];
+                                // Use local date logic instead of toISOString (which is UTC)
+                                const now = new Date();
+                                const y = now.getFullYear();
+                                const m = String(now.getMonth() + 1).padStart(2, '0');
+                                const d = String(now.getDate()).padStart(2, '0');
+                                r.date = `${y}-${m}-${d}`;
                             }
                         }
                     });
@@ -801,10 +807,23 @@
 
         function renderStats() {
             const totals = getTotals();
+            // 最高記録を計算するためのヘルパー
+            const maxRecords = {};
+            appData.skills.forEach(skill => maxRecords[skill.id] = 0);
+            appData.records.forEach(r => {
+                appData.skills.forEach(skill => {
+                    const val = parseInt(r[skill.id]) || 0;
+                    if (val > maxRecords[skill.id]) {
+                        maxRecords[skill.id] = val;
+                    }
+                });
+            });
+
             statsContainer.innerHTML = '';
 
             appData.skills.forEach(skill => {
                 const total = totals[skill.id];
+                const maxVal = maxRecords[skill.id]; // 最高記録
                 const goal = appData.goals[skill.id] || 1000;
                 const percentage = Math.min(100, (total / goal) * 100);
                 
@@ -827,8 +846,13 @@
                             <div class="text-sm font-bold text-${skill.color}-600 bg-${skill.color}-50 px-2 py-0.5 rounded-md border border-${skill.color}-100">
                                 ${skill.label}
                             </div>
-                            <div class="text-xl font-extrabold text-${skill.color}-600 leading-none">
-                                ${total}<span class="text-xs text-slate-400 ml-1 font-normal">回</span>
+                            <div class="flex items-baseline gap-3">
+                                <div class="text-xs font-bold text-orange-500">
+                                    <span class="text-sm">👑</span> 最高 <span class="text-base">${maxVal}</span>
+                                </div>
+                                <div class="text-xl font-extrabold text-${skill.color}-600 leading-none">
+                                    ${total}<span class="text-xs text-slate-400 ml-1 font-normal">回</span>
+                                </div>
                             </div>
                         </div>
                         <div class="relative w-full h-8">
